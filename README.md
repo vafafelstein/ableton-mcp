@@ -2,6 +2,21 @@
 
 # Ableton MCP
 
+> **vafafelstein fork: local-only.** Telemetry, the Supabase dataset recorder, the consent prompts, the
+> "passive" Live UI listeners and the `user_prompt` parameter on every tool are removed; the only dependency is
+> `mcp`. Nothing leaves the Mac. The Live socket stays on `127.0.0.1:9877` and now also requires a shared token
+> from `~/.ableton-mcp/token` (0600, created by the MCP server on first run) on every command.
+>
+> Install from this fork, pinned to a reviewed commit (not from PyPI, which ships upstream):
+>
+>     uvx --from git+https://github.com/vafafelstein/ableton-mcp@<commit> ableton-mcp
+>
+> Claude Desktop config: `"command": "uvx", "args": ["--from", "git+https://github.com/vafafelstein/ableton-mcp@<commit>", "ableton-mcp"]`.
+> Remote Script: copy `AbletonMCP_Remote_Script/` into Live's User Library `Remote Scripts/` folder as `AbletonMCP`,
+> then pick it under Live → Settings → Link, Tempo & MIDI → Control Surface. Start the MCP server once before
+> using it so the token file exists.
+
+
 **Connect Ableton Live to Claude AI**
 
 Prompt-assisted music production, end-to-end track creation, and Live session and arrangement manipulation — driven by AI.
@@ -98,7 +113,6 @@ That's it — ask Claude to build something.
 - [Troubleshooting](#troubleshooting)
 - [Technical Details](#technical-details)
 - [Limitations & Security Considerations](#limitations--security-considerations)
-- [Telemetry](#telemetry)
 - [Join the Community](#join-the-community)
 - [Contributing](#contributing)
 - [Disclaimer](#disclaimer)
@@ -115,7 +129,6 @@ That's it — ask Claude to build something.
 | **Clip creation** | Create and edit MIDI clips with notes |
 | **Arrangement view composition** | Build full songs autonomously in Arrangement View, including sections like intro, buildup, drop, breakdown, and outro |
 | **Session control** | Start and stop playback, fire clips, and control transport across Session View and Arrangement View |
-| **Anonymous telemetry** | Usage tracking to help improve the tool (can be disabled) |
 
 ## Components
 
@@ -294,59 +307,6 @@ The system uses a simple JSON-based protocol over TCP sockets:
 - Creating complex musical arrangements might need to be broken down into smaller steps
 - The tool is designed to work with Ableton's default devices and browser items
 - Always save your work before extensive experimentation
-
----
-
-## Telemetry
-
-There are two tiers, and they have different defaults.
-
-**Anonymous telemetry — on by default.** A random install ID, a per-run session ID, which tools ran, whether they succeeded, and how long they took. This is what counts active users and catches broken tools. It contains none of your content: no prompts, no MIDI, no track or clip names, no device settings.
-
-**Dataset recording — off by default, opt-in.** Everything with your work in it: prompts, MIDI notes, track and clip names, and device settings, which may be published as part of an open dataset used to train music-production models. Nothing here is collected unless you explicitly turn it on.
-
-To see exactly what data each tier collects, see the [Terms & Data Use](TERMS.md).
-
-### Opting in to dataset recording
-
-Either set the environment variable before starting the server:
-
-```bash
-export ABLETON_MCP_ENABLE_DATASET=true
-```
-
-…or answer the question when your client asks it. On your first tool call you're asked once — as a dialog if your client supports MCP elicitation, otherwise as a message in the chat — and answering yes turns it on from that point. Your answer is stored in `~/.ableton-mcp/consent.json`. Declining, or never answering, records nothing. If you dismiss the dialog without choosing, that isn't treated as an answer and you may be asked again in a later session.
-
-### Opting out of anonymous telemetry
-
-Set one of these before starting the MCP server:
-
-```bash
-export ABLETON_MCP_DISABLE_TELEMETRY=true
-```
-
-Or use any of these alternatives:
-
-- `DISABLE_TELEMETRY=true`
-- `MCP_DISABLE_TELEMETRY=true`
-
-This also disables dataset recording. `ABLETON_MCP_DISABLE_DATASET=true` turns off dataset recording only, and overrides any stored grant.
-
-For Claude Desktop, add the environment variable to your config:
-
-```json
-{
-    "mcpServers": {
-        "AbletonMCP": {
-            "command": "uvx",
-            "args": ["ableton-mcp"],
-            "env": {
-                "ABLETON_MCP_DISABLE_TELEMETRY": "true"
-            }
-        }
-    }
-}
-```
 
 ---
 
