@@ -116,8 +116,12 @@ class FakeClient(object):
         self.closed = True
 
 
-def _serve(script_module, chunks):
+TOKEN = "test-token"
+
+
+def _serve(script_module, chunks, token=TOKEN):
     """Run one client session and decode whatever it wrote back."""
+    script_module._read_token = lambda: token
     inst = make_instance(script_module)
     inst.running = True
     received = []
@@ -141,7 +145,7 @@ def test_command_split_mid_utf8_character_still_parses(script_module):
     ensure_ascii=False is what puts raw multi-byte on the wire.
     """
     payload = json.dumps(
-        {"type": "set_clip_name", "params": {"name": "café été"}},
+        {"type": "set_clip_name", "params": {"name": "café été"}, "token": TOKEN},
         ensure_ascii=False,
     ).encode("utf-8")
     split = payload.index(b"\xc3") + 1  # between the two bytes of 'é'
@@ -155,7 +159,7 @@ def test_command_split_mid_utf8_character_still_parses(script_module):
 
 
 def test_command_split_across_many_chunks_parses_once(script_module):
-    payload = json.dumps({"type": "get_session_info", "params": {}}).encode("utf-8")
+    payload = json.dumps({"type": "get_session_info", "params": {}, "token": TOKEN}).encode("utf-8")
     chunks = [payload[i:i + 3] for i in range(0, len(payload), 3)]
 
     received, replies = _serve(script_module, chunks)
@@ -165,8 +169,8 @@ def test_command_split_across_many_chunks_parses_once(script_module):
 
 
 def test_back_to_back_commands_each_get_one_reply(script_module):
-    first = json.dumps({"type": "start_playback", "params": {}}).encode("utf-8")
-    second = json.dumps({"type": "stop_playback", "params": {}}).encode("utf-8")
+    first = json.dumps({"type": "start_playback", "params": {}, "token": TOKEN}).encode("utf-8")
+    second = json.dumps({"type": "stop_playback", "params": {}, "token": TOKEN}).encode("utf-8")
 
     received, replies = _serve(script_module, [first, second])
 
@@ -185,6 +189,26 @@ def test_oversized_request_is_refused_instead_of_buffered_forever(
     assert received == []
     assert len(replies) == 1
     assert replies[0]["status"] == "error"
+
+
+def test_command_without_token_is_refused(script_module):
+    payload = json.dumps({"type": "start_playback", "params": {}}).encode("utf-8")
+    received, replies = _serve(script_module, [payload])
+    assert received == []
+    assert replies[0]["status"] == "error" and "token" in replies[0]["message"]
+
+
+def test_command_with_wrong_token_is_refused(script_module):
+    payload = json.dumps({"type": "start_playback", "params": {}, "token": "nope"}).encode("utf-8")
+    received, replies = _serve(script_module, [payload])
+    assert received == []
+    assert replies[0]["status"] == "error"
+
+
+def test_no_token_file_refuses_everything(script_module):
+    payload = json.dumps({"type": "start_playback", "params": {}, "token": ""}).encode("utf-8")
+    received, replies = _serve(script_module, [payload], token="")
+    assert received == []
 
 
 # ------------------------------------------------------------- browser tree
